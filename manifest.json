@@ -14,5 +14,5 @@
     "git+https://github.com/jkt628/franklinwh-direct-or-cloud@direct-or-cloud#franklinwh-direct-or-cloud>=2026.10.1",
     "netifaces>=0.11.0"
   ],
-  "version": "2026.10.4"
+  "version": "2026.10.4.1"
 }
