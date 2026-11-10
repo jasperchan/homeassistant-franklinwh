@@ -16,8 +16,10 @@ from homeassistant.core import (
     SupportsResponse,
 )
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers import device_registry as dr
 
 from .const import (
+    CONF_GATEWAY_ID,
     DOMAIN,
     SERVICE_GET_MESSAGES,
     SERVICE_SET_BATTERY_RESERVE,
@@ -146,6 +148,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
 
     return True
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: ConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Allow removing devices that no longer belong to a gateway or the account."""
+    from .sensor import account_device_id
+
+    known = {(DOMAIN, account_device_id(entry))}
+    known.update(
+        (DOMAIN, subentry.data[CONF_GATEWAY_ID])
+        for subentry in entry.subentries.values()
+        if subentry.subentry_type == "gateway"
+    )
+    return not any(identifier in known for identifier in device_entry.identifiers)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

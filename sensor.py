@@ -397,6 +397,11 @@ class FranklinWHCircuitSensorEntity(FranklinWHSensorEntity):
             return None
 
 
+def account_device_id(entry: ConfigEntry) -> str:
+    """Return the device registry identifier of the account-level device."""
+    return f"account_{entry.entry_id}"
+
+
 class FranklinWHMessageSensorEntity(FranklinWHSensorEntity):
     """Representation of a FranklinWH message sensor."""
 
@@ -412,9 +417,11 @@ class FranklinWHMessageSensorEntity(FranklinWHSensorEntity):
         # Override unique ID
         self._attr_unique_id = description.key
 
-        # Override device info
-        self._attr_device_info["identifiers"] = {(DOMAIN)}
-        self._attr_device_info["name"] = "FranklinWH"
+        # Override device info: one stable account-level device per config
+        # entry. ``{(DOMAIN)}`` was a bare string, which the device registry
+        # never matched again, so every reload created a new empty device.
+        self._attr_device_info["identifiers"] = {(DOMAIN, account_device_id(entry))}
+        self._attr_device_info["name"] = "FranklinWH Account"
 
     @property
     def native_value(self) -> float | int | None:
