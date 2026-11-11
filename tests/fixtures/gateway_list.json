@@ -1,0 +1,31 @@
+[
+  {
+    "id": "10060010A01X00000001",
+    "status": 1,
+    "connType": 3,
+    "name": "FranklinWH System",
+    "loadOption": 2,
+    "gerOption": 2,
+    "groupId": null,
+    "groupName": null,
+    "groupFlag": 0,
+    "account": "owner@example.com",
+    "protocolVer": "V1.12.47",
+    "version": "V10R11B60D00_SYS_aP1X_20_2S_AHUB",
+    "address": null,
+    "activeStatus": 1,
+    "simCardStatus": 2,
+    "activeTime": 1794266271000,
+    "installTime": null,
+    "createTime": 1789462570000,
+    "realSysHdVersion": "FranklinWH System1.5",
+    "sysHdVersion": "105",
+    "zoneInfo": "America/Los_Angeles",
+    "deviceTime": "2026-11-11 12:51:41",
+    "countryId": 2,
+    "provinceId": 39,
+    "benefitShowFlag": 1,
+    "isJoinJA12": false,
+    "zipCode": "00000"
+  }
+]

@@ -28,6 +28,8 @@ from .const import (
 from .coordinator import FranklinWHCoordinator
 
 PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
+    Platform.EVENT,
     Platform.NUMBER,
     Platform.SELECT,
     Platform.SENSOR,
@@ -72,6 +74,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Record firmware/hardware versions once every platform has registered the
+    # gateway device (entities passing sw_version=None would otherwise win).
+    device_registry = dr.async_get(hass)
+    for gateway_id, coordinator in coordinators.items():
+        info = coordinator.device_info(entry)
+        versions = {
+            key: value
+            for key in ("sw_version", "hw_version")
+            if (value := info.get(key)) is not None
+        }
+        device = device_registry.async_get_device(identifiers={(DOMAIN, gateway_id)})
+        if device is not None and versions:
+            device_registry.async_update_device(device.id, **versions)
 
     # Register services
     async def handle_get_messages(call: ServiceCall) -> ServiceResponse:

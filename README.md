@@ -122,6 +122,116 @@ After setup, all entities will be organized under a single **FranklinWH** device
 | **Circuits 3 Export** | Total energy delivered to Circuits 3 | kWh |
 | **Unread Messages** | Count of unread messages | count |
 
+### Diagnostics and alarms
+
+Read from the cloud composite status (once per minute) and a slow group of
+settings refreshed hourly. Diagnostic entities are listed under the device's
+**Diagnostic** section; the rest are operational.
+
+| Entity | Platform | Description | Unit |
+| --- | --- | --- | --- |
+| **Problem** | binary_sensor | On while any alarm is active | |
+| **Grid connected** | binary_sensor | On while utility power is present (`elecnet_state`); attribute `off_grid_flag` | |
+| **MPPT locked** | binary_sensor | On when an aPower MPPT reports status 5 (best-effort: seen with the arc-lock alarm; disabled by default until the healthy value is confirmed, raw list in attribute `mppt_status`) | |
+| **Grid export enabled** | binary_sensor | System-level grid export permission (installer setting) | |
+| **Rapid shutdown enabled** | binary_sensor | PV rapid shutdown enabled | |
+| **Alarm** | event | `raised` / `cleared` transitions with code, name, level, since, equipment, explanation and fix plan; the recorder keeps the alarm history | |
+| **Active alarms** | sensor | Number of active alarms; attribute `alarms` lists them | count |
+| **Ambient temperature** | sensor | Gateway ambient temperature | °C |
+| **Battery pack SOC** | sensor | Raw aPower pack SOC (mean over packs; attribute `per_apower`) | % |
+| **MPPT power** | sensor | DC PV power through the aPower MPPTs (attribute `per_mppt`); unit unverified (all captures read 0), disabled by default until it is confirmed against Solar Production | W |
+| **PCS state** | sensor | Power electronics state (attribute `per_apower`) | enum |
+| **BMS state** | sensor | Battery management state (attribute `per_apower`) | enum |
+| **Device status** | sensor | Standby / charging / discharging / fault / offline | enum |
+| **Connection type** | sensor | Ethernet / Wi-Fi / cellular | enum |
+| **Wi-Fi signal** | sensor | Wi-Fi signal strength | % |
+| **Cellular signal** | sensor | Cellular signal strength (vendor scale) | |
+| **Battery charge from solar today** | sensor | Daily bucket, resets at local midnight | kWh |
+| **Solar export to grid today** | sensor | Daily bucket | kWh |
+| **Battery export to grid today** | sensor | Daily bucket | kWh |
+| **Warranty throughput remaining** | sensor | Remaining warranty throughput allowance (attribute `total_throughput`) | kWh |
+| **Warranty expiration** | sensor | System warranty expiration (attribute `devices`) | date |
+| **Battery remaining energy** | sensor | Remaining energy reported per aPower, summed; refreshed hourly | kWh |
+| **Export mode** | sensor | No export / solar only / solar and aPower | enum |
+| **Message** | event | `received` for every new push message (title, content, type, received time); the recorder keeps the message history | |
+| **Latest message** | sensor | Title of the newest push message; attributes carry its `id`, `type`, `sub_type`, `content`, `received`, `read` and `messages`, the last 20 messages | |
+
+The device's firmware (`sw_version`) and hardware (`hw_version`) versions are
+filled in from the gateway list.
+
+#### Raw payloads
+
+These diagnostic sensors expose the cloud replies verbatim as attributes (no
+field renaming, so undecoded fields are visible and queryable from the
+recorder history). Every attribute set carries `fetched_at` (UTC) and stays
+under the recorder's 16 KB attribute limit; with the captured payloads the
+largest, the runtime data, is about 1.5 KB. The runtime data changes every
+poll, so expect roughly 2 MB of recorder history per day from it.
+
+| Entity | State | Attributes | Refresh |
+| --- | --- | --- | --- |
+| **Raw runtime data** | mode name | `getDeviceCompositeInfo` `runtimeData` | per poll (≥ 60 s) |
+| **Raw composite status** | decoded `deviceStatus` | the composite minus `runtimeData` and `currentAlarmVOList` (`currentWorkMode`, `deviceStatus`, `solarHaveVo`, `valid`, `csipAuxGatewayOnline`) | per poll |
+| **Raw alarms** | alarm count | `currentAlarmVOList` verbatim | per poll |
+| **Raw aPower info** | aPower count | `obtainApowersInfo` list under `result` (firmware versions, ratings, remaining energy, SOC) | hourly |
+| **Raw system settings** | fetch time | `getGatewaySystemSetting` | hourly |
+| **Raw warranty info** | expiration date | `v2/warrantyInfo` | hourly |
+| **Raw gateway info** | firmware version | the `getHomeGatewayList` entry of this gateway | hourly |
+| **Raw export settings** | export mode | `mode` and `limit_kw` from `get_export_settings` | hourly |
+| **Raw TOU settings** | current mode name | `get_tou_settings` (`getGatewayTouListV2`) | hourly |
+
+#### Alarm code catalog
+
+`alarm_codes.py` maps all 477 known alarm codes to their English names (from
+`selectDeviceRunLogList`) and fills in the name of an alarm the cloud reports
+without one. Regenerate it from a fresh capture with
+`python3 -I tools/gen_alarm_codes.py <capture.json>`.
+
+#### `franklin_wh_alarm` bus event
+
+Every alarm transition also fires a `franklin_wh_alarm` event on the Home
+Assistant event bus (the first poll after startup seeds the active alarms
+silently, so a restart does not replay long-standing alarms):
+
+```yaml
+event_type: franklin_wh_alarm
+data:
+  gateway_id: "10060010A01X00000001"
+  action: raised            # or cleared
+  id: 2756389132
+  code: "5144"
+  common_code: "5#44"
+  name: "NO.1 MPPT The arc lock fault occurs"
+  level: 2
+  time: "2026-11-10T15:01:30-08:00"
+  equipment_sn: "10050019A00X00000001"
+  explanation: "The arcing fault of the PV branch x has been triggered multiple times ..."
+  plan: "1、Check all connection points ...\n2、...\n3、..."
+```
+
+Use it as an `event` trigger, or trigger on the `event.*_alarm` entity's state
+changes.
+
+#### `franklin_wh_message` bus event
+
+Every new push message (the list is refreshed every 5 minutes, or at once when
+the unread count changes; the first list after startup is seeded silently)
+fires a `franklin_wh_message` event with the same attributes the `Message`
+event entity records:
+
+```yaml
+event_type: franklin_wh_message
+data:
+  gateway_id: "10060010A01X00000001"
+  id: 6569334
+  title: "4G signal is poor"
+  type: 1
+  sub_type: 1
+  content: "4G Poor signal. Perform network detection or connect to Ethernet or Wifi."
+  received: "2026-11-10T18:49:31-08:00"
+  read: false
+```
+
 ### Controls (some depend on installation accessories and configuration)
 
 | Entity | Description |
@@ -336,7 +446,25 @@ ______________________________________________________________________
 
 ## 📋 Changelog
 
-### Version 2026.10.4 (current)
+### Version 2026.11.11 (current)
+
+- ✨ **NEW**: diagnostics and alarms: `problem`, `grid_connected`, `mppt_locked`,
+  `grid_export_enabled`, `rapid_shutdown_enabled` binary sensors, an `alarm` event
+  entity plus the `franklin_wh_alarm` bus event, composite-info sensors (ambient
+  temperature, pack SOC, MPPT power, PCS/BMS/device/connection states, signal
+  strengths, daily solar/battery export buckets) and hourly warranty / export mode /
+  remaining energy sensors
+- ✨ **NEW**: push messages as content: `latest_message` sensor (last 20 messages
+  as attributes), `message` event entity and the `franklin_wh_message` bus event
+- ✨ **NEW**: raw payload sensors (`raw_runtime`, `raw_composite_misc`, `raw_alarms`,
+  `raw_apowers`, `raw_system_setting`, `raw_warranty`, `raw_gateway`,
+  `raw_export_settings`, `raw_tou`) exposing the cloud replies verbatim as
+  attributes, plus the alarm code catalog (`alarm_codes.py`)
+- 🔧 Diagnostics download now covers every gateway with composite, slow-group,
+  message (titles only) and alarm history data (serials and installer contact
+  redacted)
+
+### Version 2026.10.4
 
 - ✨ **NEW**: Direct Connect with scanning local networks using
   [@david2069](https://github.com/david2069)'s

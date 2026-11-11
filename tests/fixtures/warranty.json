@@ -1,0 +1,26 @@
+{
+  "expirationTime": "2038-11-09",
+  "deviceExpirationList": [
+    {
+      "sn": "10060010A01X00000001",
+      "model": "aGate",
+      "type": 0,
+      "expirationTime": "2038-11-09",
+      "subModuleExpirationTime": "2031-11-09"
+    },
+    {
+      "sn": "10050019A00X00000001",
+      "model": "aPower S",
+      "type": 1,
+      "expirationTime": "2041-11-09",
+      "subModuleExpirationTime": null
+    }
+  ],
+  "installerCompany": "Example Installer",
+  "installerCompanyPhone": "000-000-0000",
+  "equipmentSupplierPhone": "+1 000 000 0000",
+  "installerCompanyEmail": "installer@example.com",
+  "warrantyLink": "https://www.franklinwh.com/document/franklin-home-power-fhp-limited-warranty-for-end-users-en",
+  "throughput": 60,
+  "remainThroughput": 59967.82
+}

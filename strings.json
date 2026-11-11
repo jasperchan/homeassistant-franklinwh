@@ -85,5 +85,169 @@
         }
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "active_alarms": {
+        "name": "Active alarms"
+      },
+      "ambient_temperature": {
+        "name": "Ambient temperature"
+      },
+      "apower_soc": {
+        "name": "Battery pack SOC"
+      },
+      "mppt_power": {
+        "name": "MPPT power"
+      },
+      "pcs_state": {
+        "name": "PCS state",
+        "state": {
+          "off": "Off",
+          "standby": "Standby",
+          "initialization": "Initialization",
+          "fault": "Fault",
+          "warning": "Warning",
+          "running": "Running",
+          "charging": "Charging",
+          "discharging": "Discharging",
+          "online": "Online",
+          "off_grid": "Off-grid"
+        }
+      },
+      "bms_state": {
+        "name": "BMS state",
+        "state": {
+          "off": "Off",
+          "initialization": "Initialization",
+          "fault": "Fault",
+          "warning": "Warning",
+          "shutdown": "Shutdown",
+          "standby": "Standby",
+          "charging": "Charging",
+          "discharging": "Discharging"
+        }
+      },
+      "device_status": {
+        "name": "Device status",
+        "state": {
+          "standby": "Standby",
+          "charging": "Charging",
+          "discharging": "Discharging",
+          "fault": "Fault",
+          "offline": "Offline"
+        }
+      },
+      "connection_type": {
+        "name": "Connection type",
+        "state": {
+          "ethernet": "Ethernet",
+          "wifi": "Wi-Fi",
+          "cellular": "Cellular"
+        }
+      },
+      "wifi_signal": {
+        "name": "Wi-Fi signal"
+      },
+      "cellular_signal": {
+        "name": "Cellular signal"
+      },
+      "battery_charge_from_solar_today": {
+        "name": "Battery charge from solar today"
+      },
+      "solar_to_grid_today": {
+        "name": "Solar export to grid today"
+      },
+      "battery_to_grid_today": {
+        "name": "Battery export to grid today"
+      },
+      "warranty_throughput_remaining": {
+        "name": "Warranty throughput remaining"
+      },
+      "warranty_expiration": {
+        "name": "Warranty expiration"
+      },
+      "apower_remaining_energy": {
+        "name": "Battery remaining energy"
+      },
+      "export_mode": {
+        "name": "Export mode",
+        "state": {
+          "no_export": "No export",
+          "solar_only": "Solar only",
+          "solar_and_apower": "Solar and aPower"
+        }
+      },
+      "latest_message": {
+        "name": "Latest message"
+      },
+      "raw_runtime": {
+        "name": "Raw runtime data"
+      },
+      "raw_composite_misc": {
+        "name": "Raw composite status"
+      },
+      "raw_alarms": {
+        "name": "Raw alarms"
+      },
+      "raw_apowers": {
+        "name": "Raw aPower info"
+      },
+      "raw_system_setting": {
+        "name": "Raw system settings"
+      },
+      "raw_warranty": {
+        "name": "Raw warranty info"
+      },
+      "raw_gateway": {
+        "name": "Raw gateway info"
+      },
+      "raw_export_settings": {
+        "name": "Raw export settings"
+      },
+      "raw_tou": {
+        "name": "Raw TOU settings"
+      }
+    },
+    "binary_sensor": {
+      "problem": {
+        "name": "Problem"
+      },
+      "grid_connected": {
+        "name": "Grid connected"
+      },
+      "mppt_locked": {
+        "name": "MPPT locked"
+      },
+      "grid_export_enabled": {
+        "name": "Grid export enabled"
+      },
+      "rapid_shutdown_enabled": {
+        "name": "Rapid shutdown enabled"
+      }
+    },
+    "event": {
+      "alarm": {
+        "name": "Alarm",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "raised": "Raised",
+              "cleared": "Cleared"
+            }
+          }
+        }
+      },
+      "message": {
+        "name": "Message",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "received": "Received"
+            }
+          }
+        }
+      }
+    }
   }
 }
