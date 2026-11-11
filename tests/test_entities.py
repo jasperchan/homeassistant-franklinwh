@@ -79,7 +79,7 @@ def test_raw_entity_attributes_fit_and_serialise(refreshed, key):
 def test_raw_entity_states(refreshed):
     expected: dict[str, Any] = {
         "raw_runtime": "Self-Consumption",
-        "raw_composite_misc": "charging",
+        "raw_composite_misc": "online",
         "raw_alarms": 1,
         "raw_apowers": 1,
         "raw_system_setting": T0,
