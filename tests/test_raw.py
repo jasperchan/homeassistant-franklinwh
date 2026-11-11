@@ -63,7 +63,7 @@ def test_composite_misc(composite):
         "csipAuxGatewayOnline",
     }
     assert attrs["solarHaveVo"] == composite["solarHaveVo"]
-    assert raw.composite_misc_state(composite) == "charging"
+    assert raw.composite_misc_state(composite) == "online"
 
 
 def test_alarms(composite):

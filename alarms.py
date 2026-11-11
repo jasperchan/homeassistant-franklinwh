@@ -207,13 +207,13 @@ BMS_STATE: Final[dict[int, str]] = {
     7: "discharging",
 }
 
-# deviceStatus
+# deviceStatus. Observed: 1 while the aPower was in standby (this system,
+# 2026-11-11) and while another system was discharging (franklinwh-cloud live
+# trace), so 1 is "online", not "charging" as one third-party glossary claims.
+# 0 is assumed to be offline; other values are unmapped until observed.
 DEVICE_STATUS: Final[dict[int, str]] = {
-    0: "standby",
-    1: "charging",
-    2: "discharging",
-    3: "fault",
-    4: "offline",
+    0: "offline",
+    1: "online",
 }
 
 # connType (also cmdType 339 currentNetType)

@@ -14,7 +14,7 @@ def test_composite_sensor_values(composite):
     assert values.mppt_power(composite) == 0
     assert values.pcs_state(composite) == "online"
     assert values.bms_state(composite) == "standby"
-    assert values.device_status(composite) == "charging"
+    assert values.device_status(composite) == "online"
     assert values.connection_type(composite) == "wifi"
     assert values.wifi_signal(composite) == 100
     assert values.cellular_signal(composite) == 45

@@ -248,7 +248,7 @@ def test_alarm_info_frozen(tz):
 def test_enum_tables():
     assert enum_option(PCS_STATE, 8) == "online"
     assert enum_option(BMS_STATE, 5) == "standby"
-    assert enum_option(DEVICE_STATUS, 1) == "charging"
+    assert enum_option(DEVICE_STATUS, 1) == "online"
     assert enum_option(CONN_TYPE, 3) == "wifi"
     assert enum_option(EXPORT_MODE, "SOLAR_AND_APOWER") == "solar_and_apower"
     assert enum_option(PCS_STATE, 42) is None

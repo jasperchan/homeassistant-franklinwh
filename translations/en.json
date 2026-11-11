@@ -131,11 +131,8 @@
       "device_status": {
         "name": "Device status",
         "state": {
-          "standby": "Standby",
-          "charging": "Charging",
-          "discharging": "Discharging",
-          "fault": "Fault",
-          "offline": "Offline"
+          "offline": "Offline",
+          "online": "Online"
         }
       },
       "connection_type": {
