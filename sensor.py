@@ -2,6 +2,8 @@
 
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, replace
+from datetime import datetime
+from typing import Any
 
 from franklinwh import AccessoryType, RunStatus, Stats
 
@@ -12,14 +14,31 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, UnitOfEnergy, UnitOfPower
+from homeassistant.const import (
+    PERCENTAGE,
+    EntityCategory,
+    UnitOfEnergy,
+    UnitOfPower,
+    UnitOfTemperature,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MANUFACTURER, MODEL
+from . import composite as values, raw
+from .alarms import (
+    BMS_STATE,
+    CONN_TYPE,
+    DEVICE_STATUS,
+    EXPORT_MODE,
+    PCS_STATE,
+    alarm_attributes,
+    enum_options,
+)
+from .const import ATTR_ALARMS, ATTR_FETCHED_AT, DOMAIN, MANUFACTURER, MODEL
 from .coordinator import FranklinWHCoordinator
+from .messages import latest_attributes, latest_title
 
 
 @dataclass(frozen=True)
@@ -27,6 +46,293 @@ class FranklinWHSensorEntityDescription(SensorEntityDescription):
     """Describes FranklinWH sensor entity."""
 
     value_fn: Callable[[Stats], float | int | None] | None = None
+
+
+@dataclass(frozen=True)
+class FranklinWHDataSensorEntityDescription(FranklinWHSensorEntityDescription):
+    """Describes a sensor fed by the composite info, the alarms or the slow group.
+
+    ``source`` is ``composite``, ``alarms``, ``slow`` or ``message_list``;
+    for ``slow`` ``slow_field`` names the FranklinWHSlowData attribute passed
+    to ``value_fn``/``attributes_fn``. ``alarms_fn`` receives the parsed
+    alarms for attribute building. With ``fetched_at`` the attributes carry
+    the fetch time of the source and, when ``value_fn`` is ``None``, that time
+    is the state (pair it with ``SensorDeviceClass.TIMESTAMP``).
+    """
+
+    source: str = "composite"
+    slow_field: str | None = None
+    attributes_fn: Callable[[Any], dict[str, Any] | None] | None = None
+    alarms_fn: Callable[[Any], dict[str, Any] | None] | None = None
+    fetched_at: bool = False
+
+
+COMPOSITE_SENSORS: tuple[FranklinWHDataSensorEntityDescription, ...] = (
+    FranklinWHDataSensorEntityDescription(
+        key="active_alarms",
+        translation_key="active_alarms",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # count the parsed alarms so the state, the ``alarms`` attribute, the
+        # problem binary sensor and the alarm events all agree
+        source="alarms",
+        value_fn=len,
+        alarms_fn=lambda alarms: {ATTR_ALARMS: [alarm_attributes(a) for a in alarms]},
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="ambient_temperature",
+        translation_key="ambient_temperature",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=values.ambient_temperature,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="apower_soc",
+        translation_key="apower_soc",
+        native_unit_of_measurement=PERCENTAGE,
+        device_class=SensorDeviceClass.BATTERY,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=values.apower_soc,
+        attributes_fn=lambda c: {"per_apower": values.per_apower(c, "fhpSoc")},
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="mppt_power",
+        translation_key="mppt_power",
+        # W is the working assumption (see composite.mppt_power); the unit is
+        # unverified until a non-zero sample exists, so the entity stays
+        # disabled by default rather than feeding long-term statistics that
+        # could be off by 1000x.
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        value_fn=values.mppt_power,
+        attributes_fn=lambda c: {"per_mppt": values.per_mppt(c)},
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="pcs_state",
+        translation_key="pcs_state",
+        device_class=SensorDeviceClass.ENUM,
+        options=enum_options(PCS_STATE),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=values.pcs_state,
+        attributes_fn=lambda c: {"per_apower": values.per_apower_pcs_state(c)},
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="bms_state",
+        translation_key="bms_state",
+        device_class=SensorDeviceClass.ENUM,
+        options=enum_options(BMS_STATE),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=values.bms_state,
+        attributes_fn=lambda c: {"per_apower": values.per_apower_bms_state(c)},
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="device_status",
+        translation_key="device_status",
+        device_class=SensorDeviceClass.ENUM,
+        options=enum_options(DEVICE_STATUS),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=values.device_status,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="connection_type",
+        translation_key="connection_type",
+        device_class=SensorDeviceClass.ENUM,
+        options=enum_options(CONN_TYPE),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=values.connection_type,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="wifi_signal",
+        translation_key="wifi_signal",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=values.wifi_signal,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="cellular_signal",
+        translation_key="cellular_signal",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=values.cellular_signal,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="battery_charge_from_solar_today",
+        translation_key="battery_charge_from_solar_today",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=values.battery_charge_from_solar_today,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="solar_to_grid_today",
+        translation_key="solar_to_grid_today",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=values.solar_to_grid_today,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="battery_to_grid_today",
+        translation_key="battery_to_grid_today",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=values.battery_to_grid_today,
+    ),
+)
+SLOW_SENSORS: tuple[FranklinWHDataSensorEntityDescription, ...] = (
+    FranklinWHDataSensorEntityDescription(
+        key="warranty_throughput_remaining",
+        translation_key="warranty_throughput_remaining",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        source="slow",
+        slow_field="warranty",
+        value_fn=values.warranty_throughput_remaining,
+        attributes_fn=lambda w: {
+            "total_throughput": values.warranty_total_throughput(w)
+        },
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="warranty_expiration",
+        translation_key="warranty_expiration",
+        device_class=SensorDeviceClass.DATE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        source="slow",
+        slow_field="warranty",
+        value_fn=values.warranty_expiration,
+        attributes_fn=lambda w: {"devices": values.warranty_devices(w)},
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="apower_remaining_energy",
+        translation_key="apower_remaining_energy",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY_STORAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        source="slow",
+        slow_field="apowers",
+        value_fn=values.apower_remaining_energy,
+        attributes_fn=lambda a: {"per_apower": values.apower_remaining_per(a)},
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="export_mode",
+        translation_key="export_mode",
+        device_class=SensorDeviceClass.ENUM,
+        options=enum_options(EXPORT_MODE),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        source="slow",
+        slow_field="export",
+        value_fn=values.export_mode,
+        attributes_fn=lambda e: {"limit_kw": values.export_limit_kw(e)},
+    ),
+)
+MESSAGE_LIST_SENSORS: tuple[FranklinWHDataSensorEntityDescription, ...] = (
+    FranklinWHDataSensorEntityDescription(
+        key="latest_message",
+        translation_key="latest_message",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        source="message_list",
+        value_fn=latest_title,
+        attributes_fn=latest_attributes,
+        # no fetched_at: it would change every list refresh and make the
+        # recorder store the whole message list again with nothing new
+    ),
+)
+# Raw payloads, verbatim, so undecoded fields are visible in HA and recorded
+# as history. All are well under the recorder's 16 KB attribute limit with
+# the captured payloads (runtimeData, the largest, is about 1.5 KB).
+RAW_SENSORS: tuple[FranklinWHDataSensorEntityDescription, ...] = (
+    FranklinWHDataSensorEntityDescription(
+        key="raw_runtime",
+        translation_key="raw_runtime",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=raw.runtime_state,
+        attributes_fn=raw.runtime,
+        fetched_at=True,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="raw_composite_misc",
+        translation_key="raw_composite_misc",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=raw.composite_misc_state,
+        attributes_fn=raw.composite_misc,
+        fetched_at=True,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="raw_alarms",
+        translation_key="raw_alarms",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=raw.alarms_count,
+        attributes_fn=raw.alarms,
+        fetched_at=True,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="raw_apowers",
+        translation_key="raw_apowers",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        source="slow",
+        slow_field="apowers",
+        value_fn=raw.count,
+        attributes_fn=raw.result_list,
+        fetched_at=True,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="raw_system_setting",
+        translation_key="raw_system_setting",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        source="slow",
+        slow_field="system_setting",
+        attributes_fn=raw.mapping,
+        fetched_at=True,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="raw_warranty",
+        translation_key="raw_warranty",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        source="slow",
+        slow_field="warranty",
+        value_fn=raw.warranty_state,
+        attributes_fn=raw.mapping,
+        fetched_at=True,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="raw_gateway",
+        translation_key="raw_gateway",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        source="slow",
+        slow_field="gateway",
+        value_fn=raw.gateway_state,
+        attributes_fn=raw.mapping,
+        fetched_at=True,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="raw_export_settings",
+        translation_key="raw_export_settings",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        source="slow",
+        slow_field="export",
+        value_fn=values.export_mode,
+        attributes_fn=raw.export_settings,
+        fetched_at=True,
+    ),
+    FranklinWHDataSensorEntityDescription(
+        key="raw_tou",
+        translation_key="raw_tou",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        source="slow",
+        slow_field="tou",
+        value_fn=raw.tou_state,
+        attributes_fn=raw.mapping,
+        fetched_at=True,
+    ),
+)
 
 
 GENERIC_SENSORS: tuple[FranklinWHSensorEntityDescription, ...] = (
@@ -277,6 +583,17 @@ async def async_setup_entry(
                     "Expected key 'accessoryType' not found: %s", err
                 )
 
+        entities.extend(
+            _entities(coordinator, COMPOSITE_SENSORS, FranklinWHDataSensorEntity)
+        )
+        entities.extend(
+            _entities(coordinator, SLOW_SENSORS, FranklinWHDataSensorEntity)
+        )
+        entities.extend(
+            _entities(coordinator, MESSAGE_LIST_SENSORS, FranklinWHDataSensorEntity)
+        )
+        entities.extend(_entities(coordinator, RAW_SENSORS, FranklinWHDataSensorEntity))
+
         async_add_entities(entities, config_subentry_id=subentry_id)
 
 
@@ -395,6 +712,84 @@ class FranklinWHCircuitSensorEntity(FranklinWHSensorEntity):
                 "Error getting value for %s: %s", self.entity_description.key, err
             )
             return None
+
+
+class FranklinWHDataSensorEntity(FranklinWHSensorEntity):
+    """Sensor fed by the composite info (per poll) or the slow group (hourly)."""
+
+    entity_description: FranklinWHDataSensorEntityDescription
+
+    def __init__(
+        self,
+        coordinator: FranklinWHCoordinator,
+        description: FranklinWHDataSensorEntityDescription,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, description, entry)
+        self._attr_device_info = coordinator.device_info(entry)
+
+    @property
+    def _source(self) -> Any:
+        """The payload this sensor reads from, ``None`` when unavailable."""
+        description = self.entity_description
+        return self.coordinator.get_source(description.source, description.slow_field)
+
+    @property
+    def _fetched_at(self) -> datetime | None:
+        """When the payload was fetched, ``None`` when unknown."""
+        description = self.entity_description
+        return self.coordinator.get_fetched_at(
+            description.source, description.slow_field
+        )
+
+    @property
+    def native_value(self) -> Any:
+        """Return the state of the sensor."""
+        description = self.entity_description
+        if (source := self._source) is None:
+            return None
+        if description.value_fn is None:
+            return self._fetched_at if description.fetched_at else None
+
+        try:
+            return description.value_fn(source)
+        except (AttributeError, TypeError, KeyError, IndexError, ValueError) as err:
+            self.coordinator.logger.debug(
+                "Error getting value for %s: %s", description.key, err
+            )
+            return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return attributes derived from the same payload."""
+        description = self.entity_description
+        attributes: dict[str, Any] | None = None
+        try:
+            if description.alarms_fn is not None:
+                alarms = self.coordinator.get_source("alarms")
+                return None if alarms is None else description.alarms_fn(alarms)
+            if (source := self._source) is None:
+                return None
+            if description.attributes_fn is not None:
+                attributes = description.attributes_fn(source)
+        except (AttributeError, TypeError, KeyError, IndexError, ValueError) as err:
+            self.coordinator.logger.debug(
+                "Error getting attributes for %s: %s", description.key, err
+            )
+            return None
+        if description.fetched_at:
+            fetched_at = self._fetched_at
+            attributes = {
+                **(attributes or {}),
+                ATTR_FETCHED_AT: fetched_at.isoformat() if fetched_at else None,
+            }
+        return attributes
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return self.coordinator.last_update_success and self._source is not None
 
 
 def account_device_id(entry: ConfigEntry) -> str:

@@ -1,0 +1,22 @@
+{
+  "gatewayId": "10060010A01X00000001",
+  "gridPhaseConSet": 0,
+  "electricSupply": 200,
+  "ratedGridVolt": 0,
+  "ratedGridHz": 0,
+  "offGridFlag": 0,
+  "gridExportEnable": 0,
+  "apowerChPw": 20000,
+  "apowerDishPw": 20000,
+  "apowerNumber": 1,
+  "countryId": 2,
+  "emsDeviceVer": 1,
+  "bsRelyEn": 0,
+  "ratedPwr": 6,
+  "threePhPvEnb": 0,
+  "mpanGridEnb": 0,
+  "backupSolution": 0,
+  "mainPanelRate": 200,
+  "pcsSetFlag": true,
+  "rsdEnable": 1
+}

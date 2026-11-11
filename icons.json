@@ -1,0 +1,99 @@
+{
+  "entity": {
+    "sensor": {
+      "active_alarms": {
+        "default": "mdi:alert-circle-outline",
+        "range": {
+          "1": "mdi:alert-circle"
+        }
+      },
+      "wifi_signal": {
+        "default": "mdi:wifi"
+      },
+      "cellular_signal": {
+        "default": "mdi:signal-cellular-2"
+      },
+      "connection_type": {
+        "default": "mdi:lan-connect",
+        "state": {
+          "ethernet": "mdi:ethernet",
+          "wifi": "mdi:wifi",
+          "cellular": "mdi:signal-cellular-3"
+        }
+      },
+      "mppt_power": {
+        "default": "mdi:solar-power-variant"
+      },
+      "pcs_state": {
+        "default": "mdi:state-machine"
+      },
+      "bms_state": {
+        "default": "mdi:state-machine"
+      },
+      "device_status": {
+        "default": "mdi:state-machine"
+      },
+      "export_mode": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "warranty_throughput_remaining": {
+        "default": "mdi:battery-heart-variant"
+      },
+      "warranty_expiration": {
+        "default": "mdi:shield-check-outline"
+      },
+      "apower_remaining_energy": {
+        "default": "mdi:battery-charging-medium"
+      },
+      "latest_message": {
+        "default": "mdi:message-text-outline"
+      },
+      "raw_runtime": {
+        "default": "mdi:code-json"
+      },
+      "raw_composite_misc": {
+        "default": "mdi:code-json"
+      },
+      "raw_alarms": {
+        "default": "mdi:code-json"
+      },
+      "raw_apowers": {
+        "default": "mdi:code-json"
+      },
+      "raw_system_setting": {
+        "default": "mdi:code-json"
+      },
+      "raw_warranty": {
+        "default": "mdi:code-json"
+      },
+      "raw_gateway": {
+        "default": "mdi:code-json"
+      },
+      "raw_export_settings": {
+        "default": "mdi:code-json"
+      },
+      "raw_tou": {
+        "default": "mdi:code-json"
+      }
+    },
+    "binary_sensor": {
+      "grid_export_enabled": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "rapid_shutdown_enabled": {
+        "default": "mdi:solar-power-variant-outline"
+      },
+      "mppt_locked": {
+        "default": "mdi:lock-alert"
+      }
+    },
+    "event": {
+      "alarm": {
+        "default": "mdi:alarm-light"
+      },
+      "message": {
+        "default": "mdi:message-badge-outline"
+      }
+    }
+  }
+}

@@ -1,0 +1,150 @@
+{
+  "currentWorkMode": 2,
+  "deviceStatus": 1,
+  "runtimeData": {
+    "mode": 218933,
+    "name": "Self-Consumption",
+    "electricity_type": 1,
+    "run_status": 0,
+    "report_type": 1,
+    "infi_status": [
+      0
+    ],
+    "fhpSn": [
+      "10050019A00X00000001"
+    ],
+    "p_uti": 1.488,
+    "p_sun": 0.0,
+    "p_gen": 0.0,
+    "p_fhp": -0.031,
+    "p_load": 1.457,
+    "p_smart": null,
+    "p_ev": null,
+    "kwh_uti_in": 26.505,
+    "kwh_uti_out": 0.0,
+    "kwh_sun": 0.0,
+    "kwh_gen": 0.0,
+    "kwh_fhp_di": 0.011,
+    "kwh_fhp_chg": 0.183,
+    "kwh_load": 26.333,
+    "soc": 4.737,
+    "t_amb": 18.2,
+    "main_sw": [
+      1,
+      0,
+      0
+    ],
+    "pro_load": [
+      0,
+      0,
+      0
+    ],
+    "pe_stat": [
+      8
+    ],
+    "doStatus": null,
+    "bms_work": [
+      5
+    ],
+    "bms_heat_state": [
+      0
+    ],
+    "di": null,
+    "cd_alm": null,
+    "ent": null,
+    "signal": 45,
+    "sharp": null,
+    "peak": null,
+    "flat": null,
+    "valley": null,
+    "elecnet_state": 0,
+    "slaver_stat": 4,
+    "solarSupply": null,
+    "p_use": null,
+    "fhpSoc": [
+      9.5
+    ],
+    "fhpPower": [
+      -0.031
+    ],
+    "genEn": null,
+    "genStat": 0,
+    "kwhSolarLoad": 0,
+    "kwhGridLoad": 26322,
+    "kwhFhpLoad": 10,
+    "kwhGenLoad": 0,
+    "wifiSignal": 100,
+    "connType": 3,
+    "solarPower": 0,
+    "remoteSolar1Power": 0,
+    "remoteSolar2Power": 0,
+    "remoteSolarEn": 0,
+    "gridChBat": 0.182,
+    "soOutGrid": 0.0,
+    "soChBat": 0.0,
+    "batOutGrid": 0.0,
+    "threePhasePvPower": null,
+    "offgridreason": null,
+    "v2lModeEnable": 0,
+    "v2lRunState": 0,
+    "mpptAllPower": 0,
+    "apbox20Pv": null,
+    "completeInstallFlag": null,
+    "timestamp": 0,
+    "mpptSta": [
+      5
+    ],
+    "mpptActPower": [
+      0
+    ],
+    "msaInstallStartDetectTime": null,
+    "csipAuxMdLinkStatus": null,
+    "mpanPv1Wh": 0,
+    "mpanPv2Wh": 0,
+    "DSPNEMPVPower": 0,
+    "mPanPv1Power": 0,
+    "mPanPv2Power": 0
+  },
+  "solarHaveVo": {
+    "remoteSolarEn": 0,
+    "remoteSolarMode": 0,
+    "dspNemPvEn": 0,
+    "pvSplitCtEn": 0,
+    "gridSplitCtEn": 0,
+    "sysHdVersion": null,
+    "installProximalsolar": 0,
+    "isThreePhaseInstall": 0,
+    "installPv1Port": 1,
+    "installPv2Port": 1,
+    "offGridFlag": 0,
+    "offGridReason": null,
+    "mpptEnFlag": true,
+    "mpanPv1En": null,
+    "mpanPv2En": null,
+    "mpptExportEn": null,
+    "installApboxSolar": 0
+  },
+  "currentAlarmVOList": [
+    {
+      "id": 2756389132,
+      "gatewayId": "10060010A01X00000001",
+      "alarmEqSn": "10050019A00X00000001",
+      "alarmCode": "5144",
+      "commonAlarmCode": "5#44",
+      "level": 2,
+      "time": "2026-11-10 15:01:30",
+      "logName": "NO.1 MPPT The arc lock fault occurs",
+      "commonLogName": "拉弧锁定故障",
+      "logNameEn": "NO.1 MPPT The arc lock fault occurs",
+      "commonLogNameEn": "The arc lock fault occurs",
+      "createTime": null,
+      "alarmExplanationZh": "The arcing fault of the PV branch x has been triggered multiple times . Alarm trigger condition: 5 occurrences of an MPPT PV arc fault within 24 hours.",
+      "alarmExplanationEn": "The arcing fault of the PV branch x has been triggered multiple times . Alarm trigger condition: 5 occurrences of an MPPT PV arc fault within 24 hours.",
+      "alarmExplanation": "The arcing fault of the PV branch x has been triggered multiple times . Alarm trigger condition: 5 occurrences of an MPPT PV arc fault within 24 hours.",
+      "pictureUrl": "",
+      "plan": "1、Check all connection points for the corresponding MPPT PV string cables to ensure there is no poor contact.\n2、If the PV string power cable connections are secure, please clear the fault via the app.\n3、If the fault persists, please contact support at service@franklinwh.com."
+    }
+  ],
+  "valid": true,
+  "csipAuxGatewayOnline": null
+}

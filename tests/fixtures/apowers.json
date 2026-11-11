@@ -1,0 +1,18 @@
+[
+  {
+    "apowerSn": "10050019A00X00000001",
+    "ratedPower": 11.5,
+    "ratedCapacity": 15.0,
+    "status": 0,
+    "remainingPower": 1.4,
+    "fpgaVer": "V20R10B00D00",
+    "dcdcVer": "V20R80B13D00",
+    "invVer": "V20R80B28D00",
+    "bmsVer": "V20R02B20D00",
+    "blVer": "V20R02B00D00",
+    "thVer": " ",
+    "peHwVer": "21",
+    "mpptAppVer": "V20R10B30D00",
+    "soc": 9.5
+  }
+]
