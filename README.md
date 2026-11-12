@@ -135,7 +135,7 @@ settings refreshed hourly. Diagnostic entities are listed under the device's
 | **MPPT locked** | binary_sensor | On when an aPower MPPT reports status 5 (best-effort: seen with the arc-lock alarm; disabled by default until the healthy value is confirmed, raw list in attribute `mppt_status`) | |
 | **Grid export enabled** | binary_sensor | System-level grid export permission (installer setting) | |
 | **Rapid shutdown enabled** | binary_sensor | PV rapid shutdown enabled | |
-| **Alarm** | event | `raised` / `cleared` transitions with code, name, level, since, equipment, explanation and fix plan; the recorder keeps the alarm history | |
+| **Alarm** | event | `raised` / `cleared` transitions with code, name, level, since, equipment, explanation and fix plan; an alarm is the same alarm while its code and equipment serial match, whatever `id` the cloud re-logs it under; the recorder keeps the alarm history | |
 | **Active alarms** | sensor | Number of active alarms; attribute `alarms` lists them | count |
 | **Ambient temperature** | sensor | Gateway ambient temperature | °C |
 | **Battery pack SOC** | sensor | Raw aPower pack SOC (mean over packs; attribute `per_apower`) | % |
@@ -446,7 +446,15 @@ ______________________________________________________________________
 
 ## 📋 Changelog
 
-### Version 2026.11.11 (current)
+### Version 2026.11.12 (current)
+
+- 🐛 **FIX**: alarms are identified by code and equipment serial, not by the
+  cloud `id`. The aPower re-logs an active alarm under a fresh `id` (and
+  sometimes a fresh `time`) whenever it re-evaluates it, which made the `alarm`
+  event fire a raised/cleared pair for an alarm that never went away; a re-log
+  now keeps the earliest `since` and the latest record's `id`
+
+### Version 2026.11.11
 
 - ✨ **NEW**: diagnostics and alarms: `problem`, `grid_connected`, `mppt_locked`,
   `grid_export_enabled`, `rapid_shutdown_enabled` binary sensors, an `alarm` event

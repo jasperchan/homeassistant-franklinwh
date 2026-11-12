@@ -21,6 +21,8 @@ from franklin_wh.alarms import (
 )
 
 AT = datetime(2026, 11, 11, 21, 0, tzinfo=UTC)
+SN = "10050019A00X00000001"
+K5144 = ("5144", SN)  # key of the fixture alarm
 
 
 def _alarm(
@@ -43,8 +45,8 @@ def _alarm(
 
 def test_parse_alarms(composite, tz):
     alarms = parse_alarms(composite, tz, AT)
-    assert list(alarms) == [2756389132]
-    alarm = alarms[2756389132]
+    assert list(alarms) == [K5144]
+    alarm = alarms[K5144]
     assert alarm.id == 2756389132
     assert alarm.code == "5144"
     assert alarm.common_code == "5#44"
@@ -63,26 +65,29 @@ def test_parse_alarms_skips_malformed(composite, tz):
     composite = copy.deepcopy(composite)
     composite["currentAlarmVOList"].append({"id": "not-an-int", "time": "bad"})
     composite["currentAlarmVOList"].append({"alarmCode": "1"})  # no id/time
-    assert list(parse_alarms(composite, tz, AT)) == [2756389132]
+    assert list(parse_alarms(composite, tz, AT)) == [K5144]
 
 
 def test_parse_alarms_tolerates_missing_time(tz, caplog):
     # a null/absent/odd ``time`` must not drop an active alarm
     items = [
-        {**_alarm(1), "time": None},
-        {k: v for k, v in _alarm(2).items() if k != "time"},
-        {**_alarm(3), "time": "not a date"},
-        {**_alarm(4), "time": "2026-11-10T15:01:30"},  # ISO "T" separator
-        {**_alarm(5), "time": "2026-11-10T15:01:30+00:00"},  # explicit offset
+        {**_alarm(1, "1"), "time": None},
+        {k: v for k, v in _alarm(2, "2").items() if k != "time"},
+        {**_alarm(3, "3"), "time": "not a date"},
+        {**_alarm(4, "4"), "time": "2026-11-10T15:01:30"},  # ISO "T" separator
+        {**_alarm(5, "5"), "time": "2026-11-10T15:01:30+00:00"},  # explicit offset
     ]
     with caplog.at_level("WARNING"):
-        alarms = parse_alarms({"currentAlarmVOList": items}, tz, AT)
-    assert sorted(alarms) == [1, 2, 3, 4, 5]
-    assert alarms[1].since == AT
-    assert alarms[2].since == AT
-    assert alarms[3].since == AT
-    assert alarms[4].since.isoformat() == "2026-11-10T15:01:30-08:00"
-    assert alarms[5].since.isoformat() == "2026-11-10T15:01:30+00:00"
+        alarms = {
+            k[0]: a
+            for k, a in parse_alarms({"currentAlarmVOList": items}, tz, AT).items()
+        }
+    assert sorted(alarms) == ["1", "2", "3", "4", "5"]
+    assert alarms["1"].since == AT
+    assert alarms["2"].since == AT
+    assert alarms["3"].since == AT
+    assert alarms["4"].since.isoformat() == "2026-11-10T15:01:30-08:00"
+    assert alarms["5"].since.isoformat() == "2026-11-10T15:01:30+00:00"
     assert "malformed" not in caplog.text
 
 
@@ -91,14 +96,14 @@ def test_parse_alarms_keeps_known_since_when_time_missing(tz):
     known = parse_alarms(
         {"currentAlarmVOList": [{**_alarm(1), "time": None}]}, tz, first
     )
-    assert known[1].since == first
+    assert known[K5144].since == first
     later = parse_alarms(
         {"currentAlarmVOList": [{**_alarm(1), "time": None}]}, tz, AT, known
     )
-    assert later[1].since == first, "since must not drift poll to poll"
+    assert later[K5144].since == first, "since must not drift poll to poll"
     # a real time wins over the remembered fallback
     fixed = parse_alarms({"currentAlarmVOList": [_alarm(1)]}, tz, AT, known)
-    assert fixed[1].since.isoformat() == "2026-11-10T15:01:30-08:00"
+    assert fixed[K5144].since.isoformat() == "2026-11-10T15:01:30-08:00"
 
 
 def test_parse_alarms_warns_once_per_malformed_item(tz, caplog):
@@ -165,24 +170,87 @@ def test_diff_raised_new_id(tz):
     assert [(t.action, t.alarm.id) for t in transitions] == [("raised", 2)]
 
 
-def test_diff_reoccurrence_same_code_new_id(tz):
+def test_diff_relog_same_code_new_id_is_not_a_transition(tz):
+    # live 2026-11-12: the aPower re-logs an active alarm with a fresh row id
+    # (and sometimes a fresh time) on every re-evaluation; same code on the
+    # same equipment is the same alarm
     known = parse_alarms({"currentAlarmVOList": [_alarm(1)]}, tz, AT)
     current = parse_alarms(
-        {"currentAlarmVOList": [_alarm(2, since="2026-11-11 08:00:00")]}, tz, AT
+        {"currentAlarmVOList": [_alarm(2, since="2026-11-11 08:00:00")]},
+        tz,
+        AT,
+        known,
     )
-    transitions = diff_alarms(known, current, AT)
-    assert [(t.action, t.alarm.id) for t in transitions] == [
-        ("raised", 2),
-        ("cleared", 1),
+    assert diff_alarms(known, current, AT) == []
+    (alarm,) = current.values()
+    assert alarm.id == 2  # latest record wins
+    assert alarm.since.isoformat() == "2026-11-10T15:01:30-08:00"  # earliest wins
+    assert alarm.key == ("5144", "10050019A00X00000001")
+
+
+def test_parse_alarms_relog_with_earlier_time_moves_since_back(tz):
+    known = parse_alarms({"currentAlarmVOList": [_alarm(1)]}, tz, AT)
+    current = parse_alarms(
+        {"currentAlarmVOList": [_alarm(2, since="2026-11-09 01:00:00")]},
+        tz,
+        AT,
+        known,
+    )
+    (alarm,) = current.values()
+    assert alarm.since.isoformat() == "2026-11-09T01:00:00-08:00"
+
+
+def test_parse_alarms_relog_without_time_keeps_known_since(tz):
+    known = parse_alarms({"currentAlarmVOList": [_alarm(1)]}, tz, AT)
+    current = parse_alarms(
+        {"currentAlarmVOList": [{**_alarm(2), "time": None}]}, tz, AT, known
+    )
+    (alarm,) = current.values()
+    assert alarm.id == 2
+    assert alarm.since == known[alarm.key].since
+
+
+def test_parse_alarms_same_code_other_equipment_is_distinct(tz):
+    other = {**_alarm(2), "alarmEqSn": "10050019A00X00000002"}
+    current = parse_alarms({"currentAlarmVOList": [_alarm(1), other]}, tz, AT)
+    assert sorted(current) == [
+        ("5144", "10050019A00X00000001"),
+        ("5144", "10050019A00X00000002"),
     ]
+    known = parse_alarms({"currentAlarmVOList": [_alarm(1)]}, tz, AT)
+    assert [(t.action, t.alarm.id) for t in diff_alarms(known, current, AT)] == [
+        ("raised", 2)
+    ]
+
+
+def test_parse_alarms_duplicates_in_one_list_merge(tz):
+    current = parse_alarms(
+        {
+            "currentAlarmVOList": [
+                _alarm(1, since="2026-11-10 15:01:30"),
+                _alarm(2, since="2026-11-11 08:00:00"),
+            ]
+        },
+        tz,
+        AT,
+    )
+    (alarm,) = current.values()
+    assert alarm.id == 2
+    assert alarm.since.isoformat() == "2026-11-10T15:01:30-08:00"
+
+
+def test_alarm_key_falls_back_to_id_without_code(tz):
+    item = {**_alarm(9), "alarmCode": None}
+    (alarm,) = parse_alarms({"currentAlarmVOList": [item]}, tz, AT).values()
+    assert alarm.key == ("#9", "10050019A00X00000001")
 
 
 def test_diff_ordering_by_since(tz):
     known = parse_alarms(
         {
             "currentAlarmVOList": [
-                _alarm(10, since="2026-11-09 10:00:00"),
-                _alarm(11, since="2026-11-08 10:00:00"),
+                _alarm(10, "10", since="2026-11-09 10:00:00"),
+                _alarm(11, "11", since="2026-11-08 10:00:00"),
             ]
         },
         tz,
@@ -191,8 +259,8 @@ def test_diff_ordering_by_since(tz):
     current = parse_alarms(
         {
             "currentAlarmVOList": [
-                _alarm(21, since="2026-11-11 12:00:00"),
-                _alarm(20, since="2026-11-11 11:00:00"),
+                _alarm(21, "21", since="2026-11-11 12:00:00"),
+                _alarm(20, "20", since="2026-11-11 11:00:00"),
             ]
         },
         tz,
@@ -211,8 +279,8 @@ def test_sort_alarms(tz):
     alarms = parse_alarms(
         {
             "currentAlarmVOList": [
-                _alarm(2, since="2026-11-11 12:00:00"),
-                _alarm(1, since="2026-11-11 11:00:00"),
+                _alarm(2, "2", since="2026-11-11 12:00:00"),
+                _alarm(1, "1", since="2026-11-11 11:00:00"),
             ]
         },
         tz,

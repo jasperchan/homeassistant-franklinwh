@@ -21,6 +21,13 @@ _REPORTED_MALFORMED_MAX: Final = 100
 
 type AlarmAction = Literal["raised", "cleared"]
 
+# Identity of an active alarm: (alarmCode, alarmEqSn). The cloud ``id`` is the
+# row of the latest log entry for the alarm, and the aPower re-logs an active
+# alarm every time it re-evaluates it (each boot while the techs power-cycled
+# it, 2026-11-12), so the same lockout arrived under five ids in fifteen
+# minutes. Diffing on ``id`` turned each re-log into a raised+cleared pair.
+type AlarmKey = tuple[str, str]
+
 
 @dataclass(frozen=True)
 class AlarmInfo:
@@ -36,6 +43,11 @@ class AlarmInfo:
     equipment_sn: str  # alarmEqSn
     explanation: str  # alarmExplanationEn
     plan: str  # vendor fix steps, newline separated
+
+    @property
+    def key(self) -> AlarmKey:
+        """Identity across re-logs: code and equipment, not the row ``id``."""
+        return (self.code or f"#{self.id}", self.equipment_sn)
 
 
 @dataclass(frozen=True)
@@ -102,29 +114,42 @@ def parse_alarms(
     composite: Mapping[str, Any],
     tz: tzinfo,
     at: datetime,
-    known: Mapping[int, AlarmInfo] | None = None,
-) -> dict[int, AlarmInfo]:
-    """Parse ``composite["currentAlarmVOList"]`` keyed by alarm id.
+    known: Mapping[AlarmKey, AlarmInfo] | None = None,
+) -> dict[AlarmKey, AlarmInfo]:
+    """Parse ``composite["currentAlarmVOList"]`` keyed by :attr:`AlarmInfo.key`.
 
-    ``at`` (detection time) stands in for a missing ``time``; an alarm already
-    in ``known`` keeps its earlier ``since`` so the value does not drift from
-    poll to poll. Items without a usable ``id`` are skipped (warning once,
-    then debug) so a single odd alarm cannot take down the whole poll.
+    ``at`` (detection time) stands in for a missing ``time``. An alarm already
+    in ``known`` (same code and equipment) keeps the earlier of the two
+    ``since`` values, so a re-log with a fresh ``id`` and ``time`` neither
+    restarts the clock nor counts as a transition; the latest record's ``id``
+    and texts win. Two items with one key in the same list merge the same way.
+    Items without a usable ``id`` are skipped (warning once, then debug) so a
+    single odd alarm cannot take down the whole poll.
     """
-    alarms: dict[int, AlarmInfo] = {}
+    alarms: dict[AlarmKey, AlarmInfo] = {}
     for item in composite.get("currentAlarmVOList") or ():
         try:
             alarm = parse_alarm(item, tz, at)
-            if (
-                known
-                and (earlier := known.get(alarm.id)) is not None
-                and alarm.since == at
-            ):
-                alarm = replace(alarm, since=earlier.since)
         except (KeyError, ValueError, TypeError, AttributeError) as err:
             _report_malformed(item, err)
             continue
-        alarms[alarm.id] = alarm
+        earlier = alarms.get(alarm.key) or (known.get(alarm.key) if known else None)
+        if earlier is not None:
+            # a missing ``time`` (since == at) says nothing about the start
+            since = (
+                earlier.since if alarm.since == at else min(earlier.since, alarm.since)
+            )
+            if alarm.id != earlier.id:
+                _LOGGER.debug(
+                    "Alarm %s on %s re-logged as id %s (was %s), active since %s",
+                    alarm.code,
+                    alarm.equipment_sn,
+                    alarm.id,
+                    earlier.id,
+                    since,
+                )
+            alarm = replace(alarm, since=since)
+        alarms[alarm.key] = alarm
     return alarms
 
 
@@ -141,23 +166,24 @@ def _report_malformed(item: Any, err: Exception) -> None:
     log("Skipping malformed alarm %s: %s", item, err)
 
 
-def sort_alarms(alarms: Mapping[int, AlarmInfo]) -> tuple[AlarmInfo, ...]:
+def sort_alarms(alarms: Mapping[AlarmKey, AlarmInfo]) -> tuple[AlarmInfo, ...]:
     """Return the alarms ordered by ``since`` (then id for a stable order)."""
     return tuple(sorted(alarms.values(), key=lambda a: (a.since, a.id)))
 
 
 def diff_alarms(
-    known: Mapping[int, AlarmInfo],
-    current: Mapping[int, AlarmInfo],
+    known: Mapping[AlarmKey, AlarmInfo],
+    current: Mapping[AlarmKey, AlarmInfo],
     at: datetime,
 ) -> list[AlarmTransition]:
     """Return the transitions from ``known`` to ``current``.
 
-    Raised alarms (ids only in ``current``) come first, then cleared alarms
-    (ids only in ``known``); each group is ordered by ``since``.
+    Alarms are matched by :attr:`AlarmInfo.key` (code and equipment), never by
+    the cloud ``id``. Raised alarms (keys only in ``current``) come first, then
+    cleared alarms (keys only in ``known``); each group is ordered by ``since``.
     """
-    raised = sort_alarms({i: a for i, a in current.items() if i not in known})
-    cleared = sort_alarms({i: a for i, a in known.items() if i not in current})
+    raised = sort_alarms({k: a for k, a in current.items() if k not in known})
+    cleared = sort_alarms({k: a for k, a in known.items() if k not in current})
     return [AlarmTransition("raised", a, at) for a in raised] + [
         AlarmTransition("cleared", a, at) for a in cleared
     ]

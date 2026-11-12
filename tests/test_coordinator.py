@@ -260,6 +260,66 @@ def test_alarm_transitions_fire_bus_events(coordinator, client, clock):
     ]
 
 
+def test_relogged_alarm_ids_do_not_flap(coordinator, client, clock):
+    # 2026-11-12 live sequence: two active alarms, each re-logged under a new
+    # id (and later a new time) on consecutive polls, then one really clears
+    client.composite_queue.append(
+        composite_with(
+            [
+                alarm_item(2761788245, "6112", since="2026-11-12 09:34:37"),
+                alarm_item(2761788247, since="2026-11-12 09:34:37"),
+            ]
+        )
+    )
+    run(coordinator.async_refresh())
+    bus = coordinator.hass.bus
+
+    for ids in ((2761799410, 2761799411), (2761806677, 2761806678)):
+        poll(
+            coordinator,
+            clock,
+            composite_with(
+                [
+                    alarm_item(ids[0], "6112", since="2026-11-12 09:34:37"),
+                    alarm_item(ids[1], since="2026-11-12 09:34:37"),
+                ]
+            ),
+        )
+    poll(
+        coordinator,
+        clock,
+        composite_with(
+            [
+                alarm_item(2761815606, "6112", since="2026-11-12 09:44:16"),
+                alarm_item(2761815607, since="2026-11-12 09:44:16"),
+            ]
+        ),
+    )
+    bus.async_fire.assert_not_called()
+    assert [(a.code, a.id) for a in coordinator.data.alarms] == [
+        ("6112", 2761815606),
+        ("5144", 2761815607),
+    ]
+    assert {a.since.isoformat() for a in coordinator.data.alarms} == {
+        "2026-11-12T09:34:37-08:00"
+    }
+
+    # 6112 really clears while 5144 is re-logged once more
+    poll(
+        coordinator,
+        clock,
+        composite_with([alarm_item(2761924701, since="2026-11-12 09:54:07")]),
+    )
+    bus.async_fire.assert_called_once()
+    payload = bus.async_fire.call_args.args[1]
+    assert (payload["action"], payload["code"], payload["id"]) == (
+        "cleared",
+        "6112",
+        2761815606,
+    )
+    assert [(a.code, a.id) for a in coordinator.data.alarms] == [("5144", 2761924701)]
+
+
 def test_missing_alarm_list_is_not_a_clear(coordinator, client, clock):
     client.composite_queue.append(load_fixture("composite.json"))
     run(coordinator.async_refresh())

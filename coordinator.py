@@ -20,6 +20,7 @@ from homeassistant.util import dt as dt_util
 
 from .alarms import (
     AlarmInfo,
+    AlarmKey,
     AlarmTransition,
     alarm_attributes,
     diff_alarms,
@@ -214,7 +215,7 @@ class FranklinWHCoordinator(DataUpdateCoordinator[FranklinWHData]):
 
         # Alarms
         self._tz: tzinfo = dt_util.get_default_time_zone()
-        self._known_alarms: dict[int, AlarmInfo] = {}
+        self._known_alarms: dict[AlarmKey, AlarmInfo] = {}
         self._alarms_seeded = False
         self.alarm_history: deque[AlarmTransition] = deque(maxlen=ALARM_HISTORY_SIZE)
 
