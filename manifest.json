@@ -1,6 +1,6 @@
 {
   "domain": "franklin_wh",
-  "name": "FranklinWH",
+  "name": "FranklinWH (Fork)",
   "codeowners": ["@jkt628", "@JoshuaSeidel", "@richo"],
   "config_flow": true,
   "dependencies": [],
